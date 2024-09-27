@@ -1,60 +1,100 @@
-const apiKey = 'e6a4ae27afa9a21b028fdf84b44d93b6';  // Your actual API key
+const apiKey = 'e6a4ae27afa9a21b028fdf84b44d93b6'; // Your actual API key
 
 exports.handler = async function(event, context) {
     try {
-        const fetch = await import('node-fetch'); // Dynamic import for ES modules
-    
-        const params = new URLSearchParams(event.body);
-        const customerId = params.get('customer_id');
-        const pointsAmount = params.get('points_amount');
+        const fetch = await import('node-fetch');
 
-        // Validate input
-        if (!customerId || !pointsAmount) {
+        // Parse the incoming request body
+        const params = new URLSearchParams(event.body);
+        const customerIdentifier = params.get('customer_identifier');
+        const creditsAmount = params.get('credits_amount'); // Credits to redeem
+
+        // Validate input parameters
+        if (!customerIdentifier || !creditsAmount) {
             return {
-                statusCode: 400, // Bad Request if inputs are missing
+                statusCode: 400,
                 headers: {
                     'Access-Control-Allow-Origin': 'https://berobrewing.com',
                     'Access-Control-Allow-Methods': 'POST, OPTIONS',
                     'Access-Control-Allow-Headers': 'Content-Type',
                 },
-                body: JSON.stringify({
-                    error: 'Missing required parameters: customer_id or points_amount',
-                }),
+                body: JSON.stringify({ error: 'Missing required parameters: customer_identifier or credits_amount' }),
             };
         }
 
-        // API request to Rivo
-        const options = {
+        // Step 1: Fetch all rewards to get the reward_id for "credits"
+        const rewardOptions = {
+            method: 'GET',
+            headers: {
+                'Authorization': apiKey,
+                'Content-Type': 'application/json',
+            }
+        };
+
+        const rewardResponse = await fetch('https://developer-api.rivo.io/merchant_api/v1/rewards', rewardOptions);
+
+        if (!rewardResponse.ok) {
+            const rewardError = await rewardResponse.text();
+            console.error('Rivo API Error while fetching rewards:', rewardError);
+            return {
+                statusCode: rewardResponse.status,
+                headers: {
+                    'Access-Control-Allow-Origin': 'https://berobrewing.com',
+                    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type',
+                },
+                body: JSON.stringify({ error: `Failed to fetch rewards: ${rewardError}` }),
+            };
+        }
+
+        // Step 2: Parse rewards and find the reward with "credits" as the source
+        const rewardsData = await rewardResponse.json();
+        const reward = rewardsData.data.find(r => r.attributes.source === 'credits' && r.attributes.enabled);
+
+        if (!reward || !reward.id) {
+            return {
+                statusCode: 404,
+                headers: {
+                    'Access-Control-Allow-Origin': 'https://berobrewing.com',
+                    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type',
+                },
+                body: JSON.stringify({ error: 'No suitable reward found for credits' }),
+            };
+        }
+        const rewardId = reward.id;  // Extract the reward_id
+
+        // Step 3: Redeem credits using the found reward_id
+        const redemptionBody = `customer_identifier=${customerIdentifier}&reward_id=${rewardId}&credits_amount=${creditsAmount}`;
+
+        const redemptionOptions = {
             method: 'POST',
             headers: {
                 'Authorization': apiKey,
-                'Content-Type': 'application/x-www-form-urlencoded'
+                'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: `customer_id=${customer_id}&points_amount=${points_amount}`
+            body: redemptionBody,
         };
 
-        // Send request to Rivo API
-        const response = await fetch('https://developer-api.rivo.io/merchant_api/v1/points_redemptions', options);
-        
-        // Check if the response is OK
-        if (!response.ok) {
-            const errorDetails = await response.text(); // Capture error details from the response
-            console.error('Rivo API Error:', errorDetails);
+        const redemptionResponse = await fetch('https://developer-api.rivo.io/merchant_api/v1/points_redemptions', redemptionOptions);
+
+        // Handle non-OK responses
+        if (!redemptionResponse.ok) {
+            const redemptionErrorDetails = await redemptionResponse.text();
+            console.error('Rivo API Error while redeeming credits:', redemptionErrorDetails);
             return {
-                statusCode: response.status,
+                statusCode: redemptionResponse.status,
                 headers: {
                     'Access-Control-Allow-Origin': 'https://berobrewing.com',
                     'Access-Control-Allow-Methods': 'POST, OPTIONS',
                     'Access-Control-Allow-Headers': 'Content-Type',
                 },
-                body: JSON.stringify({
-                    error: `Failed to redeem points: ${errorDetails}`,
-                }),
+                body: JSON.stringify({ error: `Failed to redeem credits: ${redemptionErrorDetails}` }),
             };
         }
 
-        // Parse the API response data
-        const data = await response.json();
+        // Step 4: Parse and return success response
+        const redemptionData = await redemptionResponse.json();
         return {
             statusCode: 200,
             headers: {
@@ -62,10 +102,11 @@ exports.handler = async function(event, context) {
                 'Access-Control-Allow-Methods': 'POST, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type',
             },
-            body: JSON.stringify(data),
+            body: JSON.stringify(redemptionData),
         };
+
     } catch (error) {
-        console.error('Function Error:', error); // Log the full error details
+        console.error('Function Error:', error);
         return {
             statusCode: 500,
             headers: {
@@ -73,10 +114,7 @@ exports.handler = async function(event, context) {
                 'Access-Control-Allow-Methods': 'POST, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type',
             },
-            body: JSON.stringify({
-                error: 'An internal server error occurred.',
-                details: error.message, // Include the error message
-            }),
+            body: JSON.stringify({ error: 'An internal server error occurred.', details: error.message }),
         };
     }
 };
