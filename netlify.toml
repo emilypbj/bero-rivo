@@ -1,0 +1,7 @@
+[build]
+  functions = "netlify/functions"  # Location of your serverless functions
+
+[dev]
+  # Port settings for local dev server
+  port = 8888
+  functionsPort = 3999  # You can specify where your functions run, this is optional

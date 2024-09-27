@@ -1,0 +1,16 @@
+{
+  "name": "rivo-app-proxy",
+  "version": "1.0.0",
+  "description": "Serverless proxy for Rivo API using Netlify",
+  "main": "index.js",
+  "scripts": {
+    "start": "netlify dev"
+  },
+  "dependencies": {
+    "node-fetch": "^3.0.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^6.0.0"
+  },
+  "license": "MIT"
+}
