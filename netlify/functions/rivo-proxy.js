@@ -30,7 +30,7 @@ exports.handler = async function(event, context) {
                 'Authorization': apiKey,
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: `customerId=${customerId}&pointsAmount=${pointsAmount}`
+            body: `customer_id=${customer_id}&points_amount=${points_amount}`
         };
 
         // Send request to Rivo API
