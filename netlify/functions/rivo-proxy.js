@@ -1,9 +1,8 @@
+const fetch = require('node-fetch');
 const apiKey = 'e6a4ae27afa9a21b028fdf84b44d93b6'; // Your actual API key
 
 exports.handler = async function(event, context) {
     try {
-        const fetch = await import('node-fetch');
-
         // Parse the incoming request body
         const params = new URLSearchParams(event.body);
         const customerIdentifier = params.get('customer_identifier');
